@@ -1,39 +1,33 @@
-import streamlit as st
-import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
-
-# Configuração da página
-st.set_page_config(page_title="Dashboard Estude com Danilo", layout="wide")
-
-# Função para conectar ao Google Sheets
-def conectar_google_sheets():
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    
-    creds_dict = st.secrets["gcp_service_account"]
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-    client = gspread.authorize(creds)
-    return client
-
-# Título do Dashboard
-st.title("🚀 Dashboard Mentoria")
-
 try:
-    # Abre a planilha
     client = conectar_google_sheets()
-    sh = client.open("Dashboar DB")
     
-    # Lê a aba 'Alunos'
+    ID_PLANILHA = "1fh9e5mSvMYKbs1BcuknM5Cuhj8Bbqn-r_enPUt1e5_g" 
+    sh = client.open_by_key(ID_PLANILHA)
+    
+    # Tenta ler a aba 'Alunos' (Verifique se o nome na aba é exatamente este)
     aba_alunos = sh.worksheet("Alunos")
-    df_alunos = pd.DataFrame(aba_alunos.get_all_records())
+    dados = aba_alunos.get_all_records()
     
-    # Exibe um seletor de teste
-    st.subheader("Teste de Conexão")
-    aluno_selecionado = st.selectbox("Selecione um aluno para testar:", df_alunos['nome'].tolist())
-    st.write(f"Você selecionou o aluno: {aluno_selecionado}")
-    
-    # Mostra a tabela de alunos (apenas para validar)
-    st.dataframe(df_alunos)
+    if not dados:
+        st.warning("A aba 'Alunos' parece estar vazia.")
+    else:
+        df_alunos = pd.DataFrame(dados)
+        st.success("Conectado com sucesso!")
+        
+        # Filtros básicos para teste
+        st.subheader("Filtros de Teste")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            mentoria = st.multiselect("Filtrar por Mentoria", df_alunos['id_mentoria'].unique())
+        
+        # Aplica filtro se selecionado
+        df_filtrado = df_alunos
+        if mentoria:
+            df_filtrado = df_alunos[df_alunos['id_mentoria'].isin(mentoria)]
+            
+        st.dataframe(df_filtrado)
 
 except Exception as e:
-    st.error(f"Erro ao conectar: {e}")
+    st.error(f"Erro detalhado: {e}")
+    st.info("Dica: Verifique se o e-mail da conta de serviço foi adicionado como EDITOR na planilha.")
