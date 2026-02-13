@@ -179,7 +179,7 @@ def _render_historico_simulados(
         df_hist["%"] = (df_hist["acertos"] / df_hist["total"] * 100).map("{:.2f}%".format)
         colunas = ["Data_Str", "tipo", "numero", "ano", "area", "acertos", "total", "%"]
 
-        if nome_sel == "Todos os Alunos":
+        if nome_sel == "Todos":
             df_hist = df_hist.merge(df_alunos[["id_aluno", "nome"]], on="id_aluno")
             colunas = ["nome"] + colunas
 
@@ -348,7 +348,7 @@ def exibir_modulo_simulados(df_alunos: pd.DataFrame, df_simulados: pd.DataFrame)
         _render_historico_simulados(df_base, df_alunos, nome_sel)
 
     with tab_rank:
-        if nome_sel == "Todos os Alunos":
+        if nome_sel == "Todos":
             _render_ranking_geral(df_simulados, df_alunos)
         else:
             _render_ranking_individual(simulados_validos, df_simulados, id_aluno_focado, nome_sel)
