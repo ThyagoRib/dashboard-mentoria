@@ -5,6 +5,9 @@ import pandas as pd
 import numpy as np
 import math
 
+# Importação necessária para o filtro de mentoria
+MAPA_MENTORIAS = {1: "Estude com Danilo", 2: "Projeto Medicina"}
+
 ORDEM_AREAS = ["Linguagens", "Humanas", "Natureza", "Matemática"]
 TOTAL_QUESTOES_COMPLETO = 180
 NUM_AREAS = 4
@@ -95,9 +98,18 @@ def _render_cards_records(simulados_validos: pd.DataFrame, df_completos: pd.Data
 
 
 def _render_diagnostico_geral(df_base: pd.DataFrame) -> None:
+    if df_base.empty:
+        st.warning("Sem dados disponíveis para os filtros selecionados.")
+        return
+
     col_esq, col_dir = st.columns([1, 1.2])
 
     df_radar = df_base.groupby("area")["rendimento_perc"].mean().reset_index()
+    
+    if df_radar.empty:
+        st.info("Dados insuficientes para gerar o gráfico radar.")
+        return
+
     categorias = df_radar["area"].tolist() + [df_radar["area"].tolist()[0]]
     valores    = df_radar["rendimento_perc"].tolist() + [df_radar["rendimento_perc"].tolist()[0]]
 
@@ -135,6 +147,11 @@ def _render_diagnostico_area(df_base: pd.DataFrame, area_sel: str) -> None:
     col_esq, col_dir = st.columns([1, 1.2])
 
     df_area = df_base[df_base["area"] == area_sel].copy()
+    
+    if df_area.empty:
+        st.info(f"Sem dados registrados para a área: {area_sel}")
+        return
+
     df_plot = (
         df_area.groupby(df_area["data"].dt.date)["rendimento_perc"]
         .mean().reset_index().sort_values("data")
@@ -173,6 +190,9 @@ def _render_diagnostico_area(df_base: pd.DataFrame, area_sel: str) -> None:
 def _render_historico_simulados(
     df_base: pd.DataFrame, df_alunos: pd.DataFrame, nome_sel: str
 ) -> None:
+    if df_base.empty:
+        return
+
     with st.expander("📄 Histórico Completo de Simulados"):
         df_hist = df_base.copy()
         df_hist["Data_Str"] = df_hist["data"].dt.strftime("%d/%m/%Y")
@@ -191,11 +211,16 @@ def _render_historico_simulados(
 
 # --- Aba: Ranking & Posicionamento ---
 
-def _render_ranking_geral(df_simulados: pd.DataFrame, df_alunos: pd.DataFrame) -> None:
+def _render_ranking_geral(df_simulados: pd.DataFrame, df_alunos: pd.DataFrame, df_base: pd.DataFrame) -> None:
     st.subheader("🏆 Ranking Geral - Simulados Completos")
+    
+    tipos_disponiveis = sorted(df_simulados["tipo"].unique())
+    if not tipos_disponiveis:
+        return
+
     c1, c2, c3 = st.columns(3)
     with c1:
-        r_tipo = st.selectbox("Tipo", sorted(df_simulados["tipo"].unique()), key="r_t")
+        r_tipo = st.selectbox("Tipo", tipos_disponiveis, key="r_t")
     with c2:
         r_num = st.selectbox(
             "Número",
@@ -218,7 +243,12 @@ def _render_ranking_geral(df_simulados: pd.DataFrame, df_alunos: pd.DataFrame) -
         & (df_simulados["numero"] == r_num)
         & (df_simulados["ano"] == r_ano)
     ]
+    
+    # Filtra o ranking apenas pelos alunos que pertencem à base filtrada (Mentoria/Aluno)
+    df_f = df_f[df_f["id_aluno"].isin(df_base["id_aluno"].unique())]
+    
     if df_f.empty:
+        st.info("Nenhum dado encontrado para o ranking com estes filtros.")
         return
 
     rp = df_f.pivot_table(index="id_aluno", columns="area", values="acertos", aggfunc="sum").reset_index()
@@ -312,22 +342,37 @@ def exibir_modulo_simulados(df_alunos: pd.DataFrame, df_simulados: pd.DataFrame)
     st.title("📚 Central de Simulados")
     st.subheader("*Simulados revelam padrões, estratégia corrige trajetórias*")
 
-    # Filtros laterais
-    lista_alunos = ["Todos"] + sorted(df_alunos["nome"].unique().tolist())
+    # --- FILTRO DE MENTORIA ---
+    st.sidebar.subheader("Configurações de Análise")
+    mapa_ids = {v: k for k, v in MAPA_MENTORIAS.items()}
+    ids_presentes = sorted(df_alunos["id_mentoria"].unique().tolist())
+    nomes_mentorias = [MAPA_MENTORIAS.get(i, f"Mentoria {i}") for i in ids_presentes]
+
+    mentoria_sel = st.sidebar.selectbox("Mentoria", ["Todas"] + nomes_mentorias)
+
+    if mentoria_sel == "Todas":
+        alunos_filtrados = df_alunos
+    else:
+        id_mentoria = mapa_ids[mentoria_sel]
+        alunos_filtrados = df_alunos[df_alunos["id_mentoria"] == id_mentoria]
+
+    # Filtros laterais dependentes da mentoria
+    lista_alunos = ["Todos"] + sorted(alunos_filtrados["nome"].unique().tolist())
     nome_sel = st.sidebar.selectbox("Mentorado", lista_alunos, key="simu_aluno")
 
     areas_disponiveis = ["Todas"] + sorted(df_simulados["area"].unique().tolist())
     area_sel = st.sidebar.selectbox("Área", areas_disponiveis)
 
     if nome_sel == "Todos":
-        df_base = df_simulados.copy()
+        # Filtra os simulados apenas dos alunos pertencentes à mentoria selecionada
+        df_base = df_simulados[df_simulados["id_aluno"].isin(alunos_filtrados["id_aluno"])].copy()
         id_aluno_focado = None
     else:
         id_aluno_focado = df_alunos[df_alunos["nome"] == nome_sel]["id_aluno"].values[0]
         df_base = df_simulados[df_simulados["id_aluno"] == id_aluno_focado].copy()
 
     simulados_validos, df_completos = _filtrar_simulados_completos(df_base)
-    df_base["rendimento_perc"] = df_base["acertos"] / df_base["total"] * 100
+    df_base["rendimento_perc"] = (df_base["acertos"] / df_base["total"] * 100).fillna(0)
 
     tab_perf, tab_rank = st.tabs(["📈 Desempenho & Consistência", "🏆 Ranking & Posicionamento"])
 
@@ -349,7 +394,7 @@ def exibir_modulo_simulados(df_alunos: pd.DataFrame, df_simulados: pd.DataFrame)
 
     with tab_rank:
         if nome_sel == "Todos":
-            _render_ranking_geral(df_simulados, df_alunos)
+            _render_ranking_geral(df_simulados, df_alunos, df_base)
         else:
             _render_ranking_individual(simulados_validos, df_simulados, id_aluno_focado, nome_sel)
 
