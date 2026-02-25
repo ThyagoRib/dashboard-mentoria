@@ -152,8 +152,9 @@ def _render_diagnostico_area(df_base: pd.DataFrame, area_sel: str) -> None:
         st.info(f"Sem dados registrados para a área: {area_sel}")
         return
 
+    df_area["data"] = pd.to_datetime(df_area["data"])
     df_plot = (
-        df_area.groupby(df_area["data"].dt.date)["rendimento_perc"]
+        df_area.groupby("data")["rendimento_perc"]
         .mean().reset_index().sort_values("data")
     )
 
@@ -171,10 +172,10 @@ def _render_diagnostico_area(df_base: pd.DataFrame, area_sel: str) -> None:
         fig_line = px.line(df_plot, x="data", y="rendimento_perc", markers=True)
         fig_line.update_traces(
             line=dict(color="#c00000", width=2),
-            hovertemplate="<b>Data: %{x}</b><br>Média: %{y:.1f}%<extra></extra>",
+            hovertemplate="<b>Data: %{x|%d/%m/%Y}</b><br>Média: %{y:.1f}%<extra></extra>",
         )
         if len(df_plot) > 1:
-            x_ord = pd.to_datetime(df_plot["data"]).apply(lambda x: x.toordinal())
+            x_ord = df_plot["data"].apply(lambda x: x.toordinal())
             slope, intercept = np.polyfit(x_ord, df_plot["rendimento_perc"], 1)
             fig_line.add_trace(go.Scatter(
                 x=df_plot["data"], y=slope * x_ord + intercept,
@@ -183,6 +184,7 @@ def _render_diagnostico_area(df_base: pd.DataFrame, area_sel: str) -> None:
             ))
         fig_line.update_layout(
             template="plotly_dark", height=380, yaxis_range=[0, 105], showlegend=False,
+            xaxis=dict(tickformat="%d/%m/%y") # Formato BR no eixo X
         )
         st.plotly_chart(fig_line, use_container_width=True)
 
@@ -195,19 +197,29 @@ def _render_historico_simulados(
 
     with st.expander("📄 Histórico Completo de Simulados"):
         df_hist = df_base.copy()
-        df_hist["Data_Str"] = df_hist["data"].dt.strftime("%d/%m/%Y")
-        df_hist["%"] = (df_hist["acertos"] / df_hist["total"] * 100).map("{:.2f}%".format)
-        colunas = ["Data_Str", "tipo", "numero", "ano", "area", "acertos", "total", "%"]
+        
+        df_hist["data"] = pd.to_datetime(df_hist["data"])
+        
+        df_hist["Data"] = df_hist["data"].dt.strftime("%d/%m/%Y").fillna("Data N/D")
+        
+        df_hist["%"] = (df_hist["acertos"] / df_hist["total"] * 100).fillna(0).map("{:.1f}%".format)
+        
+        colunas_originais = ["Data", "tipo", "numero", "ano", "area", "acertos", "total", "%"]
 
         if nome_sel == "Todos":
             df_hist = df_hist.merge(df_alunos[["id_aluno", "nome"]], on="id_aluno")
-            colunas = ["nome"] + colunas
+            colunas_finais = ["nome"] + colunas_originais
+        else:
+            colunas_finais = colunas_originais
+
+        df_render = df_hist.sort_values("data", ascending=False)
+        df_render = df_render[colunas_finais]
 
         st.dataframe(
-            df_hist[colunas].sort_values("Data_Str", ascending=False).rename(columns={"Data_Str": "Data"}),
-            use_container_width=True, hide_index=True,
+            df_render,
+            use_container_width=True, 
+            hide_index=True,
         )
-
 
 # --- Aba: Ranking & Posicionamento ---
 
