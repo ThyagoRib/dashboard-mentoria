@@ -162,13 +162,27 @@ def _render_radar_individual(df_filtrado: pd.DataFrame, df_redacoes: pd.DataFram
 
 # --- Histórico ---
 
-def _render_historico(df_filtrado: pd.DataFrame) -> None:
+def _render_historico(df_filtrado: pd.DataFrame, df_alunos: pd.DataFrame, nome_sel: str) -> None:
     with st.expander("📋 Ver Histórico Detalhado de Redações"):
-        df_tab = df_filtrado.sort_values("data", ascending=False).copy()
-        df_tab["data"] = df_tab["data"].dt.strftime("%d/%m/%Y")
+        df_tab = df_filtrado.copy()
+        
+        df_tab["data_f"] = df_tab["data"].dt.strftime("%d/%m/%Y")
+        
+        colunas_base = ["data_f", "tema", "c1", "c2", "c3", "c4", "c5", "total"]
+        
+        if nome_sel == "Todos":
+            df_tab = df_tab.merge(df_alunos[["id_aluno", "nome"]], on="id_aluno")
+            colunas_finais = ["nome"] + colunas_base
+        else:
+            colunas_finais = colunas_base
+
+        df_render = df_tab.sort_values("data", ascending=False)[colunas_finais]
+        df_render = df_render.rename(columns={"data_f": "data"})
+
         st.dataframe(
-            df_tab[["data", "tema", "c1", "c2", "c3", "c4", "c5", "total"]],
-            use_container_width=True, hide_index=True,
+            df_render,
+            use_container_width=True, 
+            hide_index=True,
         )
 
 
@@ -189,7 +203,6 @@ def exibir_modulo_redacoes(df_alunos: pd.DataFrame, df_redacoes: pd.DataFrame) -
 
     df_filtrado = df_redacoes[mask_geral].copy()
     df_filtrado["tema"] = df_filtrado["tema"].replace(["", None, np.nan], "Não informado")
-    df_filtrado["data"] = pd.to_datetime(df_filtrado["data"], dayfirst=True)
     df_filtrado = df_filtrado.sort_values("data")
 
     if df_filtrado.empty:
@@ -205,7 +218,7 @@ def exibir_modulo_redacoes(df_alunos: pd.DataFrame, df_redacoes: pd.DataFrame) -
         _render_evolucao_individual(df_filtrado)
         _render_radar_individual(df_filtrado, df_redacoes)
 
-    _render_historico(df_filtrado)
+    _render_historico(df_filtrado, df_alunos, nome_sel)
 
     st.markdown("---")
     col1, col_centro, col2 = st.columns([2, 1, 2])
