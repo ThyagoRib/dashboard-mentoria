@@ -424,6 +424,10 @@ def exibir_avaliacao_individual(df_alunos: pd.DataFrame, df_atividades: pd.DataF
     _render_historico(dados_filtrado)
 
     st.markdown("---")
-    _, col_centro, _ = st.columns([2, 1, 2])
+    col1, col_centro, col2 = st.columns([2, 1, 2])
     with col_centro:
         st.image("logo.png", width=250)
+    with col1:
+        st.caption("*© 2026 • Central de Performance Acadêmica - Estude com Danilo*")
+    with col2:
+        st.markdown('<p style="text-align: right; color: grey; font-size: 0.8rem;">Desenvolvido por Thyago Ribeiro</p>', unsafe_allow_html=True)

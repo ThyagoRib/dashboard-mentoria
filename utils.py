@@ -30,25 +30,31 @@ def _to_numeric(df: pd.DataFrame, colunas: list[str]) -> pd.DataFrame:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     return df
 
-
 @st.cache_data(ttl=600)
-def carregar_dados() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Busca as três abas do Google Sheets. Cache de 10 min."""
+def carregar_dados() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Busca as quatro abas do Google Sheets (incluindo Redações). Cache de 10 min."""
     client = _conectar()
     sh = client.open_by_key(_SHEET_ID)
 
+    # 1. Alunos
     df_alunos = pd.DataFrame(sh.worksheet("Alunos").get_all_records())
 
+    # 2. Atividades
     df_atividades = pd.DataFrame(sh.worksheet("Atividades").get_all_records())
     df_atividades = _padronizar_data(df_atividades)
     df_atividades = _to_numeric(df_atividades, ["acertos", "total"])
-    df_atividades["%"] = df_atividades.apply(
-        lambda row: (row["acertos"] / row["total"] * 100) if row["total"] > 0 else 0,
-        axis=1,
-    )
+    df_atividades["%"] = (df_atividades["acertos"] / df_atividades["total"] * 100).fillna(0)
 
+    # 3. Simulados
     df_simulados = pd.DataFrame(sh.worksheet("Simulados").get_all_records())
     df_simulados = _padronizar_data(df_simulados)
     df_simulados = _to_numeric(df_simulados, ["acertos", "total"])
 
-    return df_alunos, df_atividades, df_simulados
+    # 4. Redações (Nova integração)
+    df_redacoes = pd.DataFrame(sh.worksheet("Redações").get_all_records())
+    df_redacoes = _padronizar_data(df_redacoes)
+    # Convertendo colunas de competências e total para numérico
+    colunas_red = ["c1", "c2", "c3", "c4", "c5", "total"]
+    df_redacoes = _to_numeric(df_redacoes, colunas_red)
+
+    return df_alunos, df_atividades, df_simulados, df_redacoes

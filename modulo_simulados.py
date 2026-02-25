@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import math
 
-# Importação necessária para o filtro de mentoria
 MAPA_MENTORIAS = {1: "Estude com Danilo", 2: "Projeto Medicina"}
 
 ORDEM_AREAS = ["Linguagens", "Humanas", "Natureza", "Matemática"]
@@ -42,10 +41,10 @@ _CSS_MODULO = """
 </style>
 """
 
+
 # --- Helpers ---
 
 def _filtrar_simulados_completos(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Retorna (simulados_validos, df_completos) — apenas provas com 4 áreas e 180 questões."""
     if df.empty:
         return pd.DataFrame(), pd.DataFrame()
     check = (
@@ -60,9 +59,11 @@ def _filtrar_simulados_completos(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Dat
     df_completos = df.merge(simulados_validos[chaves], on=chaves)
     return simulados_validos, df_completos
 
+
 def _posicao_ranking(idx: int) -> str:
     emojis = {0: "🥇", 1: "🥈", 2: "🥉"}
     return emojis.get(idx, f"{idx + 1}º")
+
 
 # --- Aba: Desempenho & Consistência ---
 
@@ -82,9 +83,9 @@ def _render_cards_records(simulados_validos: pd.DataFrame, df_completos: pd.Data
     c1, c2, c3, c4 = st.columns(4)
     cards = [
         (c1, "#28a745", "🏆 Melhor Área",  melhor_area_nome, f"{int(melhor_area_val)}", "acertos"),
-        (c2, "#c00000", "⚠️ Ponto de Melhoria",    pior_area_nome,   f"{int(pior_area_val)}",  "acertos"),
-        (c3, "#c00000", "🎯 Recorde Individual",       "Simulado Geral", f"{int(melhor_nota_total)}", "/180"),
-        (c4, "#c00000", "📝 Simulados Concluídos",  "Concluídos",     f"{qtd_completos}",           "simulados"),
+        (c2, "#c00000", "⚠️ Ponto de Melhoria", pior_area_nome, f"{int(pior_area_val)}", "acertos"),
+        (c3, "#c00000", "🎯 Recorde Individual", "Simulado Geral", f"{int(melhor_nota_total)}", "/180"),
+        (c4, "#c00000", "📝 Simulados Concluídos", "Concluídos", f"{qtd_completos}", "simulados"),
     ]
     for col, cor, label, titulo, valor, sufixo in cards:
         with col:
@@ -96,6 +97,7 @@ def _render_cards_records(simulados_validos: pd.DataFrame, df_completos: pd.Data
                 f'{valor} <span style="font-size:0.6em;color:#888;">{sufixo}</span></p></div>',
                 unsafe_allow_html=True,
             )
+
 
 def _render_diagnostico_geral(df_base: pd.DataFrame) -> None:
     if df_base.empty:
@@ -141,6 +143,7 @@ def _render_diagnostico_geral(df_base: pd.DataFrame) -> None:
         )
         st.plotly_chart(fig_vol, use_container_width=True)
 
+
 def _render_diagnostico_area(df_base: pd.DataFrame, area_sel: str) -> None:
     col_esq, col_dir = st.columns([1, 1.2])
     df_area = df_base[df_base["area"] == area_sel].copy()
@@ -183,6 +186,7 @@ def _render_diagnostico_area(df_base: pd.DataFrame, area_sel: str) -> None:
         )
         st.plotly_chart(fig_line, use_container_width=True)
 
+
 def _render_historico_simulados(
     df_base: pd.DataFrame, df_alunos: pd.DataFrame, nome_sel: str
 ) -> None:
@@ -204,39 +208,47 @@ def _render_historico_simulados(
             use_container_width=True, hide_index=True,
         )
 
+
 # --- Aba: Ranking & Posicionamento ---
 
 def _render_ranking_geral(df_simulados: pd.DataFrame, df_alunos: pd.DataFrame, df_base: pd.DataFrame) -> None:
-    st.subheader("🏆 Ranking Geral Estratégico")
+    st.subheader("🏆 Ranking Geral")
     
-    tipos_disponiveis = sorted(df_simulados["tipo"].unique(), key=str)
-    if not tipos_disponiveis:
+    if df_base.empty:
+        st.info("Sem dados disponíveis para montar o ranking.")
         return
-
+    
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        r_tipo = st.selectbox("Tipo", tipos_disponiveis, key="r_t")
+        r_tipo = st.selectbox("Tipo", sorted(df_simulados["tipo"].unique(), key=str), key="r_t")
     with c2:
         nums = df_simulados[df_simulados["tipo"] == r_tipo]["numero"].unique()
         r_num = st.selectbox("Número", sorted(nums, key=str), key="r_n")
     with c3:
-        anos = df_simulados[(df_simulados["tipo"] == r_tipo) & (df_simulados["numero"] == r_num)]["ano"].unique()
+        anos = df_simulados[
+            (df_simulados["tipo"] == r_tipo) & (df_simulados["numero"] == r_num)
+        ]["ano"].unique()
         r_ano = st.selectbox("Ano", sorted(anos, key=str), key="r_a")
     with c4:
-        r_visao = st.selectbox("Visão do Ranking", ["Completo", "Dia 1 (Ling/Hum)", "Dia 2 (Nat/Mat)"], key="r_v")
+        r_visao = st.selectbox(
+            "Visão",
+            ["Completo", "Dia 1 (Ling/Hum)", "Dia 2 (Nat/Mat)"],
+            key="r_v",
+        )
 
     df_f = df_simulados[
-        (df_simulados["tipo"] == r_tipo) & (df_simulados["numero"] == r_num) & (df_simulados["ano"] == r_ano)
+        (df_simulados["tipo"] == r_tipo)
+        & (df_simulados["numero"] == r_num)
+        & (df_simulados["ano"] == r_ano)
     ]
-    
     df_f = df_f[df_f["id_aluno"].isin(df_base["id_aluno"].unique())]
     
     if df_f.empty:
-        st.info("Nenhum dado encontrado para o ranking com estes filtros.")
+        st.warning("⚠️ Nenhum registro encontrado para este simulado.")
         return
 
     rp = df_f.pivot_table(index="id_aluno", columns="area", values="acertos", aggfunc="sum").reset_index()
-    # TRATAMENTO: Garante que as colunas existam para evitar KeyError
+    
     for area in ORDEM_AREAS:
         if area not in rp.columns:
             rp[area] = np.nan
@@ -246,38 +258,74 @@ def _render_ranking_geral(df_simulados: pd.DataFrame, df_alunos: pd.DataFrame, d
 
     if r_visao == "Completo":
         rf = rf[rf["total"] == TOTAL_QUESTOES_COMPLETO].copy()
+        if rf.empty:
+            st.info("Sem registros completos (180 questões) para este simulado.")
+            return
+        rf["Total Dia 1"] = rf[DIA_1].sum(axis=1)
+        rf["Total Dia 2"] = rf[DIA_2].sum(axis=1)
+        rf["Total Geral"] = rf["Total Dia 1"] + rf["Total Dia 2"]
+        colunas_exibir = ["Posição", "Aluno"] + ORDEM_AREAS + ["Total Dia 1", "Total Dia 2", "Total Geral"]
+        
     elif r_visao == "Dia 1 (Ling/Hum)":
         rf = rf[rf[DIA_1].notnull().all(axis=1)].copy()
-    else: 
-        rf = rf[rf[DIA_2].notnull().all(axis=1)].copy()
-
-    if rf.empty:
-        st.warning("⚠️ Não há dados suficientes para gerar o ranking nesta visão.")
-        return
-
-    rf["Total Dia 1"] = rf[DIA_1].sum(axis=1, min_count=1)
-    rf["Total Dia 2"] = rf[DIA_2].sum(axis=1, min_count=1)
-    
-    if r_visao == "Completo":
-        rf["Total Geral"] = rf["Total Dia 1"].fillna(0) + rf["Total Dia 2"].fillna(0)
-        col_ordenacao = "Total Geral"
-        colunas_exibir = ["Posição", "Aluno"] + ORDEM_AREAS + ["Total Dia 1", "Total Dia 2", "Total Geral"]
-    elif r_visao == "Dia 1 (Ling/Hum)":
-        col_ordenacao = "Total Dia 1"
+        if rf.empty:
+            st.info("Sem registros para o Dia 1 neste simulado.")
+            return
+        rf["Total Dia 1"] = rf[DIA_1].sum(axis=1)
         colunas_exibir = ["Posição", "Aluno"] + DIA_1 + ["Total Dia 1"]
+        
     else:
-        col_ordenacao = "Total Dia 2"
+        rf = rf[rf[DIA_2].notnull().all(axis=1)].copy()
+        if rf.empty:
+            st.info("Sem registros para o Dia 2 neste simulado.")
+            return
+        rf["Total Dia 2"] = rf[DIA_2].sum(axis=1)
         colunas_exibir = ["Posição", "Aluno"] + DIA_2 + ["Total Dia 2"]
 
-    rf = (
-        rf.merge(df_alunos[["id_aluno", "nome"]], on="id_aluno")
-        .sort_values(col_ordenacao, ascending=False)
-        .reset_index(drop=True)
-    )
-    rf["Posição"] = [_posicao_ranking(i) for i in range(len(rf))]
-    rf = rf.rename(columns={"nome": "Aluno"})
+    rf = rf.merge(df_alunos[["id_aluno", "nome"]], on="id_aluno").rename(columns={"nome": "Aluno"})
+    col_notas = [c for c in colunas_exibir if c not in ["Posição", "Aluno"]]
 
-    st.dataframe(rf[colunas_exibir], use_container_width=True, hide_index=True)
+    st.markdown("---")
+    col_ordem_sel = st.radio("Ordenar ranking por:", col_notas, index=len(col_notas)-1, horizontal=True)
+
+    top_10 = rf.sort_values(col_ordem_sel, ascending=False).head(10)
+    medias_top10 = top_10[col_notas].mean().round(0).to_dict()
+    
+    linha_media = {
+        "Posição": "---",
+        "Aluno": "📊 MÉDIA TOP 10",
+        **medias_top10,
+        "is_media": 1
+    }
+    
+    rf["is_media"] = 0
+    rf_final = pd.concat([rf, pd.DataFrame([linha_media])], ignore_index=True)
+    
+    for col in col_notas:
+        rf_final[col] = pd.to_numeric(rf_final[col]).fillna(0).astype(int)
+
+    rf_final = rf_final.sort_values(by=[col_ordem_sel, "is_media"], ascending=[False, True]).reset_index(drop=True)
+
+    pos_aluno = 0
+    list_pos = []
+    for _, row in rf_final.iterrows():
+        if row["is_media"] == 1:
+            list_pos.append("---")
+        else:
+            list_pos.append(_posicao_ranking(pos_aluno))
+            pos_aluno += 1
+    rf_final["Posição"] = list_pos
+
+    def _style_row(row):
+        color = 'background-color: rgba(192, 0, 0, 0.2); font-weight: bold' if row['Aluno'] == "📊 MÉDIA TOP 10" else ''
+        return [color] * len(row)
+
+    st.dataframe(
+        rf_final[colunas_exibir].style.apply(_style_row, axis=1), 
+        use_container_width=True, 
+        hide_index=True
+    )
+
 
 def _render_ranking_individual(
     df_simulados: pd.DataFrame,
@@ -292,7 +340,6 @@ def _render_ranking_individual(
         key="r_v_ind"
     )
 
-    # Identificar todos os simulados que este aluno participou
     aluno_simus = df_simulados[df_simulados["id_aluno"] == id_aluno_focado][["tipo", "numero", "ano"]].drop_duplicates()
 
     if aluno_simus.empty:
@@ -307,7 +354,6 @@ def _render_ranking_individual(
             (df_simulados["ano"] == row["ano"])
         ]
         
-        # Pivotagem e tratamento de colunas ausentes
         comp_pivot = comp.pivot_table(index="id_aluno", columns="area", values="acertos", aggfunc="sum").reset_index()
         for area in ORDEM_AREAS:
             if area not in comp_pivot.columns: 
@@ -316,7 +362,6 @@ def _render_ranking_individual(
         comp_qtd = comp.groupby("id_aluno")["total"].sum().reset_index()
         rank = comp_pivot.merge(comp_qtd, on="id_aluno")
 
-        # Definição de colunas e métricas baseadas na visão
         if r_visao_ind == "Completo":
             rank = rank[rank["total"] == TOTAL_QUESTOES_COMPLETO].copy()
             if rank.empty: continue
@@ -335,7 +380,7 @@ def _render_ranking_individual(
             cols_interesse = DIA_1 + ["Sort_Col"]
             map_nomes = {"Sort_Col": "Total Dia 1"}
             
-        else: # Dia 2
+        else:
             rank = rank[rank[DIA_2].notnull().all(axis=1)].copy()
             if rank.empty: continue
             
@@ -343,7 +388,6 @@ def _render_ranking_individual(
             cols_interesse = DIA_2 + ["Sort_Col"]
             map_nomes = {"Sort_Col": "Total Dia 2"}
 
-        # Cálculo da posição do aluno no ranking daquele simulado específico
         if id_aluno_focado in rank["id_aluno"].values:
             rank = rank.sort_values("Sort_Col", ascending=False).reset_index(drop=True)
             idx = rank[rank["id_aluno"] == id_aluno_focado].index[0]
@@ -352,7 +396,6 @@ def _render_ranking_individual(
                 "Simulado": f"{row['tipo']} {row['numero']} ({row['ano']})",
                 "Posição": f"{_posicao_ranking(idx)} de {len(rank)}"
             }
-            # Adiciona as notas por área e totais
             for col in cols_interesse:
                 val = rank.loc[idx, col]
                 nome_col = map_nomes.get(col, col)
@@ -365,6 +408,7 @@ def _render_ranking_individual(
         st.dataframe(df_resumo, use_container_width=True, hide_index=True)
     else:
         st.warning("⚠️ Nenhum registro completo encontrado para os critérios selecionados nesta visão.")
+
 
 # --- Ponto de entrada ---
 
@@ -424,6 +468,10 @@ def exibir_modulo_simulados(df_alunos: pd.DataFrame, df_simulados: pd.DataFrame)
             _render_ranking_individual(df_simulados, id_aluno_focado, nome_sel)
 
     st.markdown("---")
-    _, col_centro, _ = st.columns([2, 1, 2])
+    col1, col_centro, col2 = st.columns([2, 1, 2])
     with col_centro:
         st.image("logo.png", width=250)
+    with col1:
+        st.caption("*© 2026 • Central de Performance Acadêmica - Estude com Danilo*")
+    with col2:
+        st.markdown('<p style="text-align: right; color: grey; font-size: 0.8rem;">Desenvolvido por Thyago Ribeiro</p>', unsafe_allow_html=True)

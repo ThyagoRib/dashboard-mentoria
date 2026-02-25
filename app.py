@@ -4,6 +4,7 @@ from estilos import aplicar_estilos
 from utils import carregar_dados
 import modulo_individual
 import modulo_simulados
+import modulo_redacoes
 
 st.set_page_config(page_title="Mentoria Estude com Danilo", page_icon="icon.jpg", layout="wide")
 aplicar_estilos()
@@ -37,7 +38,7 @@ authentication_status = st.session_state.get("authentication_status")
 # Roteamento por status de autenticação
 if authentication_status:
     try:
-        df_alunos, df_atividades, df_simulados = carregar_dados()
+        df_alunos, df_atividades, df_simulados, df_redacoes = carregar_dados()
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
         st.stop()
@@ -47,7 +48,7 @@ if authentication_status:
 
     modulo = st.sidebar.radio(
         "Painel",
-        ["🚀 Central de Alta Performance", "📚 Central de Simulados"],
+        ["🚀 Central de Alta Performance", "✍️ Central de Redações", "📚 Central de Simulados"],
     )
 
     st.sidebar.markdown("---")
@@ -56,6 +57,8 @@ if authentication_status:
         modulo_individual.exibir_avaliacao_individual(df_alunos, df_atividades)
     elif modulo == "📚 Central de Simulados":
         modulo_simulados.exibir_modulo_simulados(df_alunos, df_simulados)
+    elif modulo == "✍️ Central de Redações":
+        modulo_redacoes.exibir_modulo_redacoes(df_alunos, df_redacoes)
 
     st.sidebar.markdown("---")
     authenticator.logout("Sair", "sidebar")
